@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Sweet Memories 💕</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Floating Hearts Background -->
+  <div class="hearts-bg" id="heartsBg"></div>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo-area">
+        <span class="heart-icon">♥</span>
+        <div>
+          <h1 class="site-title">Our Sweet Memories</h1>
+          <p class="site-tagline">Every picture holds a story of us ✨</p>
+        </div>
+        <span class="heart-icon">♥</span>
+      </div>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" onclick="showSection('gallery')">📸 Gallery</button>
+        <button class="nav-tab" onclick="showSection('slideshow')">🎞️ Slideshow</button>
+        <button class="nav-tab" onclick="showSection('upload')">💌 Upload</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- ===== GALLERY SECTION ===== -->
+    <section id="section-gallery" class="section active">
+      <div class="section-header">
+        <h2 class="section-title">Our Precious Moments</h2>
+        <p class="section-sub">Tap any photo to view it fully ♡</p>
+      </div>
+      <div class="gallery-grid" id="galleryGrid">
+        <div class="gallery-empty" id="galleryEmpty">
+          <div class="empty-icon">📷</div>
+          <p>No memories yet…</p>
+          <p>Upload your first photo to start your love story!</p>
+          <button class="btn-primary" onclick="showSection('upload')">Upload Now 💕</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SLIDESHOW SECTION ===== -->
+    <section id="section-slideshow" class="section">
+      <div class="section-header">
+        <h2 class="section-title">Our Love Story</h2>
+        <p class="section-sub">Relive every sweet moment together ♡</p>
+      </div>
+
+      <div class="slideshow-wrap">
+        <div class="slideshow-container" id="slideshowContainer">
+          <div class="slideshow-empty" id="slideshowEmpty">
+            <div class="empty-icon">🎞️</div>
+            <p>Upload some memories to start the slideshow!</p>
+            <button class="btn-primary" onclick="showSection('upload')">Upload Now 💕</button>
+          </div>
+          <div class="slide-frame" id="slideFrame" style="display:none;">
+            <img id="slideImg" src="" alt="Memory" />
+            <div class="slide-caption" id="slideCaption"></div>
+            <div class="slide-date" id="slideDate"></div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="slideshow-controls" id="slideshowControls" style="display:none;">
+          <button class="ctrl-btn" id="prevBtn" onclick="prevSlide()">‹</button>
+          <div class="ctrl-center">
+            <button class="ctrl-btn play-btn" id="playBtn" onclick="togglePlay()">▶</button>
+            <div class="slide-dots" id="slideDots"></div>
+          </div>
+          <button class="ctrl-btn" id="nextBtn" onclick="nextSlide()">›</button>
+        </div>
+
+        <!-- Transition Picker -->
+        <div class="transition-picker" id="transitionPicker" style="display:none;">
+          <p class="trans-label">✨ Choose Transition</p>
+          <div class="trans-btns">
+            <button class="trans-btn active" onclick="setTransition('fade', this)">Fade</button>
+            <button class="trans-btn" onclick="setTransition('slide', this)">Slide</button>
+            <button class="trans-btn" onclick="setTransition('zoom', this)">Zoom</button>
+            <button class="trans-btn" onclick="setTransition('flip', this)">Flip</button>
+            <button class="trans-btn" onclick="setTransition('blur', this)">Blur</button>
+          </div>
+        </div>
+
+        <!-- Counter -->
+        <div class="slide-counter" id="slideCounter" style="display:none;">
+          <span id="counterText">1 / 1</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== UPLOAD SECTION ===== -->
+    <section id="section-upload" class="section">
+      <div class="section-header">
+        <h2 class="section-title">Add a Memory 💌</h2>
+        <p class="section-sub">Share a moment that made your heart smile ♡</p>
+      </div>
+
+      <div class="upload-card">
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <div class="drop-icon">📷</div>
+          <p class="drop-title">Tap to choose photos</p>
+          <p class="drop-sub">or drag & drop here</p>
+          <p class="drop-hint">JPG, PNG, WEBP · Max 10MB each</p>
+          <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" onchange="handleFileSelect(event)" />
+        </div>
+
+        <!-- Caption Input -->
+        <div class="form-group">
+          <label class="form-label">💬 Caption (optional)</label>
+          <input type="text" id="captionInput" class="form-input" placeholder="e.g. Our first anniversary dinner 🥂" maxlength="120" />
+        </div>
+
+        <!-- Previews -->
+        <div class="preview-row" id="previewRow"></div>
+
+        <!-- Upload Button -->
+        <button class="btn-primary btn-upload" id="uploadBtn" onclick="uploadImages()" disabled>
+          Upload to Our Gallery 💕
+        </button>
+
+        <!-- Progress -->
+        <div class="upload-progress" id="uploadProgress" style="display:none;">
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <p class="progress-text" id="progressText">Uploading…</p>
+        </div>
+      </div>
+
+      <!-- CONFIG NOTICE -->
+      <div class="config-notice" id="configNotice">
+        <div class="notice-icon">⚙️</div>
+        <div>
+          <strong>Setup Required</strong>
+          <p>Open <code>config.js</code> and paste your Cloudinary credentials to enable uploads.</p>
+          <a href="#" onclick="showSetupGuide()" class="notice-link">View setup guide →</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <button class="lb-close" onclick="closeLightbox()">✕</button>
+    <div class="lb-inner">
+      <button class="lb-nav lb-prev" onclick="lightboxNav(-1, event)">‹</button>
+      <div class="lb-img-wrap">
+        <img id="lbImg" src="" alt="" />
+        <div class="lb-meta">
+          <p class="lb-caption" id="lbCaption"></p>
+          <p class="lb-date" id="lbDate"></p>
+        </div>
+      </div>
+      <button class="lb-nav lb-next" onclick="lightboxNav(1, event)">›</button>
+    </div>
+    <div class="lb-actions">
+      <a id="lbDownload" class="btn-download" download>⬇ Download</a>
+    </div>
+  </div>
+
+  <!-- SETUP MODAL -->
+  <div class="modal-overlay" id="setupModal" style="display:none;">
+    <div class="modal-box">
+      <button class="modal-close" onclick="document.getElementById('setupModal').style.display='none'">✕</button>
+      <h3 class="modal-title">⚙️ Setup Guide</h3>
+      <ol class="setup-steps">
+        <li>Create a free account at <strong>cloudinary.com</strong></li>
+        <li>In your dashboard, find your <strong>Cloud Name</strong></li>
+        <li>Go to Settings → Upload → Add Upload Preset (set to <em>Unsigned</em>)</li>
+        <li>Open <code>config.js</code> in this project</li>
+        <li>Replace <code>YOUR_CLOUD_NAME</code> and <code>YOUR_UPLOAD_PRESET</code> with your values</li>
+        <li>Save, push to GitHub, and you're live! 🎉</li>
+      </ol>
+      <button class="btn-primary" onclick="document.getElementById('setupModal').style.display='none'">Got it 💕</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <footer class="site-footer">
+    <p>Made with ♥ for you & me · Always</p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
