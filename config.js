@@ -1,34 +1,30 @@
 // ============================================================
-//  config.js — YOUR CLOUDINARY CREDENTIALS GO HERE
-//  
-//  SETUP STEPS:
-//  1. Create a free account at https://cloudinary.com
-//  2. Copy your Cloud Name from the dashboard
-//  3. Go to Settings → Upload → Add an Upload Preset
-//     • Set signing mode to "Unsigned"
-//     • Name it anything (e.g. "memories_upload")
-//     • Set folder to "memories" (optional but recommended)
-//  4. Replace the values below with your own
-//  5. Save this file, commit, and push to GitHub
+//  config.js — YOUR CREDENTIALS
+//
+//  You need TWO free services:
+//  1. Cloudinary  → stores the actual photos
+//  2. JSONBin.io  → stores the shared list of photo URLs
+//                   (so both users see the same gallery)
 // ============================================================
 
+// ── Cloudinary (image storage) ───────────────────────────────
+// Get these from: cloudinary.com → Dashboard
 const CLOUDINARY_CONFIG = {
   cloudName:    'dry5njpao',     // e.g. 'dxyz1234abc'
   uploadPreset: 'lovely_images',  // e.g. 'memories_upload'
-  apiKey:       '266763638277274',        // e.g. '123456789012345'  ← NEW
 };
 
-// ============================================================
-//  Optional: Customize your site here
-// ============================================================
+// ── JSONBin (shared database) ────────────────────────────────
+// Get these from: jsonbin.io → follow setup steps below
+const JSONBIN_CONFIG = {
+  binId:     '69fb136d856a682189b1c6f2',      // e.g. '6643f1e4acd3cb34a83e5f2a'
+  masterKey: '$2a$10$FAMddAE0jCbifixey8xQGOc3jJJCCVGVzg/mi9Tf4wlAcpBfDfOUC',  // e.g. '$2a$10$abc123...'
+};
 
+// ── Site settings ─────────────────────────────────────────────
 const SITE_CONFIG = {
-  // Name shown in the header (change to your names!)
-  coupleName: 'Our Sweet Memories',
-
-  // Slideshow auto-play interval (milliseconds)
+  coupleName:        'Our Sweet Memories',
   slideshowInterval: 4000,
-
-  // Maximum file size in MB
-  maxFileSizeMB: 10,
+  maxFileSizeMB:     10,
+  folder:            'memories',
 };

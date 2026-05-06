@@ -1,10 +1,11 @@
 // ============================================================
 //  app.js — Our Sweet Memories
-//  Images are loaded from Cloudinary (shared between all users)
+//  Shared gallery using JSONBin.io as a tiny free database
+//  Both users read & write the same image list
 // ============================================================
 
 // ── State ────────────────────────────────────────────────────
-let images       = [];   // { url, caption, date, publicId, width, height }
+let images       = [];
 let currentSlide = 0;
 let slideTimer   = null;
 let isPlaying    = false;
@@ -17,7 +18,7 @@ window.addEventListener('DOMContentLoaded', () => {
   generateHearts();
   setupDragDrop();
   checkConfig();
-  fetchAllImages();  // ← Load shared images from Cloudinary
+  loadSharedGallery();
 });
 
 // ── Navigation ───────────────────────────────────────────────
@@ -30,105 +31,63 @@ function showSection(name) {
   if (name === 'slideshow') initSlideshow();
 }
 
-// ── Fetch ALL images from Cloudinary (shared gallery) ────────
-async function fetchAllImages() {
+// ── JSONBin: Load shared image list ──────────────────────────
+async function loadSharedGallery() {
   if (CLOUDINARY_CONFIG.cloudName === 'YOUR_CLOUD_NAME') {
     renderGallery();
     return;
   }
-
-  showLoadingState(true);
-
-  try {
-    // Use Cloudinary's Search API to get all images in the folder
-    // This works with just the API Key (no secret needed for this endpoint)
-    const folder = SITE_CONFIG.folder;
-    const url = `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/list/${folder}.json`;
-
-    const res = await fetch(url);
-
-    if (!res.ok) {
-      // Fallback: try the search API with a signed request is not possible client-side,
-      // so we use the resource list approach via a named tag
-      await fetchByTag();
-      return;
-    }
-
-    const data = await res.json();
-    if (data.resources && data.resources.length > 0) {
-      images = data.resources.map(r => {
-        const context = r.context?.custom || {};
-        return {
-          url:      `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload/${r.public_id}`,
-          caption:  context.caption || '',
-          date:     context.date    || formatDateFromPublicId(r.public_id),
-          publicId: r.public_id,
-        };
-      }).reverse(); // Newest first
-    } else {
-      images = [];
-    }
-  } catch (err) {
-    console.warn('List fetch failed, trying tag method:', err);
-    await fetchByTag();
+  if (!JSONBIN_CONFIG.binId || JSONBIN_CONFIG.binId === 'YOUR_BIN_ID') {
+    // No JSONBin yet — fall back to localStorage so uploader sees their own images
+    loadFromLocalStorage();
     return;
   }
 
-  showLoadingState(false);
-  renderGallery();
-}
-
-// Fallback: fetch by tag "memory" (we tag every upload)
-async function fetchByTag() {
+  showLoadingState(true);
   try {
-    const url = `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/list/memory.json`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Tag list failed');
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_CONFIG.binId}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_CONFIG.masterKey }
+    });
     const data = await res.json();
-
-    if (data.resources && data.resources.length > 0) {
-      images = data.resources.map(r => {
-        const context = r.context?.custom || {};
-        return {
-          url:      `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload/${r.public_id}`,
-          caption:  context.caption || '',
-          date:     context.date    || '',
-          publicId: r.public_id,
-        };
-      }).reverse();
-    } else {
-      images = [];
-    }
+    images = (data.record && Array.isArray(data.record.images)) ? data.record.images : [];
   } catch (err) {
-    console.error('Could not load images from Cloudinary:', err);
-    images = [];
+    console.warn('JSONBin read failed, using localStorage:', err);
+    loadFromLocalStorage();
   }
   showLoadingState(false);
   renderGallery();
 }
 
-function formatDateFromPublicId(publicId) {
-  // Try to extract a readable date if possible, otherwise return empty
-  return '';
+// Save updated image list back to JSONBin (shared)
+async function saveSharedGallery() {
+  if (!JSONBIN_CONFIG.binId || JSONBIN_CONFIG.binId === 'YOUR_BIN_ID') {
+    saveToLocalStorage();
+    return;
+  }
+  try {
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_CONFIG.binId}`, {
+      method:  'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_CONFIG.masterKey
+      },
+      body: JSON.stringify({ images })
+    });
+  } catch (err) {
+    console.warn('JSONBin write failed, saving locally:', err);
+    saveToLocalStorage();
+  }
 }
 
-function showLoadingState(loading) {
-  const grid = document.getElementById('galleryGrid');
-  let loader = document.getElementById('galleryLoader');
-  if (loading) {
-    if (!loader) {
-      loader = document.createElement('div');
-      loader.id = 'galleryLoader';
-      loader.className = 'gallery-empty';
-      loader.innerHTML = `<div class="loading-hearts">
-        <span>♥</span><span>♥</span><span>♥</span>
-      </div><p>Loading your memories…</p>`;
-      grid.appendChild(loader);
-    }
-    loader.style.display = 'block';
-  } else {
-    if (loader) loader.style.display = 'none';
-  }
+// LocalStorage fallback
+function loadFromLocalStorage() {
+  try {
+    const s = localStorage.getItem('sweetMemories_images');
+    images = s ? JSON.parse(s) : [];
+  } catch(e) { images = []; }
+}
+function saveToLocalStorage() {
+  try { localStorage.setItem('sweetMemories_images', JSON.stringify(images)); } catch(e) {}
 }
 
 // ── Floating Hearts ──────────────────────────────────────────
@@ -139,12 +98,30 @@ function generateHearts() {
     const el = document.createElement('span');
     el.className = 'heart-float';
     el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-    el.style.left            = Math.random() * 100 + 'vw';
-    el.style.fontSize        = (Math.random() * 14 + 10) + 'px';
-    el.style.color           = `hsl(${Math.random() * 30 + 340}, 80%, ${Math.random() * 20 + 65}%)`;
+    el.style.left              = Math.random() * 100 + 'vw';
+    el.style.fontSize          = (Math.random() * 14 + 10) + 'px';
+    el.style.color             = `hsl(${Math.random() * 30 + 340},80%,${Math.random() * 20 + 65}%)`;
     el.style.animationDuration = (Math.random() * 14 + 10) + 's';
     el.style.animationDelay    = (Math.random() * 12) + 's';
     container.appendChild(el);
+  }
+}
+
+// ── Loading State ─────────────────────────────────────────────
+function showLoadingState(loading) {
+  const grid = document.getElementById('galleryGrid');
+  let loader = document.getElementById('galleryLoader');
+  if (loading) {
+    if (!loader) {
+      loader = document.createElement('div');
+      loader.id = 'galleryLoader';
+      loader.className = 'gallery-empty';
+      loader.innerHTML = `<div class="loading-hearts"><span>♥</span><span>♥</span><span>♥</span></div><p>Loading your memories…</p>`;
+      grid.appendChild(loader);
+    }
+    loader.style.display = 'block';
+  } else {
+    if (loader) loader.style.display = 'none';
   }
 }
 
@@ -152,19 +129,14 @@ function generateHearts() {
 function renderGallery() {
   const grid  = document.getElementById('galleryGrid');
   const empty = document.getElementById('galleryEmpty');
-
   grid.querySelectorAll('.gallery-item').forEach(el => el.remove());
 
-  if (images.length === 0) {
-    empty.style.display = 'block';
-    return;
-  }
+  if (images.length === 0) { empty.style.display = 'block'; return; }
   empty.style.display = 'none';
 
   images.forEach((img, idx) => {
     const item = document.createElement('div');
     item.className = 'gallery-item';
-    // Use Cloudinary auto-format & quality for faster loading on mobile
     const thumbUrl = img.url.replace('/upload/', '/upload/f_auto,q_auto,w_400/');
     item.innerHTML = `
       <img src="${thumbUrl}" alt="${img.caption || 'Memory'}" loading="lazy" />
@@ -172,19 +144,17 @@ function renderGallery() {
         ${img.caption ? `<p class="gallery-item-caption">${escHtml(img.caption)}</p>` : ''}
       </div>
       <a class="gallery-download-btn" href="${img.url}" download="memory-${idx+1}.jpg"
-         onclick="event.stopPropagation()" title="Download">⬇</a>
-    `;
+         onclick="event.stopPropagation()" title="Download">⬇</a>`;
     item.addEventListener('click', () => openLightbox(idx));
     grid.appendChild(item);
   });
 }
 
-// ── Refresh Button (pull latest from Cloudinary) ─────────────
-function refreshGallery() {
+async function refreshGallery() {
   images = [];
   renderGallery();
-  fetchAllImages();
-  showToast('🔄 Refreshing gallery…');
+  await loadSharedGallery();
+  showToast('🔄 Gallery refreshed!');
 }
 
 // ── Lightbox ─────────────────────────────────────────────────
@@ -196,13 +166,11 @@ function openLightbox(idx) {
 }
 function updateLightbox() {
   const img = images[lbIndex];
-  const fullUrl = img.url.replace('/upload/', '/upload/f_auto,q_auto/');
-  document.getElementById('lbImg').src = fullUrl;
+  document.getElementById('lbImg').src = img.url.replace('/upload/', '/upload/f_auto,q_auto/');
   document.getElementById('lbCaption').textContent = img.caption || '';
   document.getElementById('lbDate').textContent    = img.date    || '';
   const dl = document.getElementById('lbDownload');
-  dl.href     = img.url;
-  dl.download = `memory-${lbIndex+1}.jpg`;
+  dl.href = img.url; dl.download = `memory-${lbIndex+1}.jpg`;
 }
 function closeLightbox(e) {
   if (e && e.target !== e.currentTarget && !e.target.classList.contains('lightbox')) return;
@@ -221,7 +189,7 @@ document.addEventListener('keydown', e => {
   if (!lb.classList.contains('open')) return;
   if (e.key === 'Escape')     closeLightbox({ currentTarget: lb, target: lb });
   if (e.key === 'ArrowLeft')  lightboxNav(-1, null);
-  if (e.key === 'ArrowRight') lightboxNav(1, null);
+  if (e.key === 'ArrowRight') lightboxNav(1,  null);
 });
 
 // ── Slideshow ─────────────────────────────────────────────────
@@ -233,17 +201,15 @@ function initSlideshow() {
   const counter  = document.getElementById('slideCounter');
 
   if (images.length === 0) {
-    [empty].forEach(el => el.style.display = 'block');
+    empty.style.display = 'block';
     [frame, controls, picker, counter].forEach(el => el.style.display = 'none');
     return;
   }
-
   empty.style.display    = 'none';
   frame.style.display    = 'block';
   controls.style.display = 'flex';
   picker.style.display   = 'block';
   counter.style.display  = 'block';
-
   currentSlide = 0;
   renderSlide();
   renderDots();
@@ -255,12 +221,9 @@ function renderSlide() {
   frame.classList.remove('trans-fade','trans-slide','trans-zoom','trans-flip','trans-blur');
   void frame.offsetWidth;
   frame.classList.add('trans-' + transition);
-
-  const slideUrl = img.url.replace('/upload/', '/upload/f_auto,q_auto,w_900/');
-  document.getElementById('slideImg').src = slideUrl;
+  document.getElementById('slideImg').src = img.url.replace('/upload/', '/upload/f_auto,q_auto,w_900/');
   document.getElementById('slideCaption').textContent = img.caption || '';
   document.getElementById('slideDate').textContent    = img.date    || '';
-
   document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
   document.getElementById('counterText').textContent = `${currentSlide + 1} / ${images.length}`;
 }
@@ -278,14 +241,12 @@ function renderDots() {
 
 function nextSlide() { currentSlide = (currentSlide + 1) % images.length; renderSlide(); }
 function prevSlide() { currentSlide = (currentSlide - 1 + images.length) % images.length; renderSlide(); }
-
 function togglePlay() {
   isPlaying = !isPlaying;
   document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
   if (isPlaying) slideTimer = setInterval(nextSlide, SITE_CONFIG.slideshowInterval);
   else clearInterval(slideTimer);
 }
-
 function setTransition(type, btn) {
   transition = type;
   document.querySelectorAll('.trans-btn').forEach(b => b.classList.remove('active'));
@@ -293,10 +254,8 @@ function setTransition(type, btn) {
 }
 
 // ── File Select & Preview ─────────────────────────────────────
-function handleFileSelect(e) {
-  addPendingFiles(Array.from(e.target.files));
-  e.target.value = '';
-}
+function handleFileSelect(e) { addPendingFiles(Array.from(e.target.files)); e.target.value = ''; }
+
 function addPendingFiles(files) {
   const maxBytes = SITE_CONFIG.maxFileSizeMB * 1024 * 1024;
   files.forEach(file => {
@@ -307,18 +266,18 @@ function addPendingFiles(files) {
   });
   document.getElementById('uploadBtn').disabled = pendingFiles.length === 0;
 }
+
 function addPreview(file, idx) {
   const reader = new FileReader();
   reader.onload = e => {
     const thumb = document.createElement('div');
     thumb.className = 'preview-thumb';
-    thumb.innerHTML = `
-      <img src="${e.target.result}" alt="preview" />
-      <button class="preview-remove" onclick="removePreview(this,${idx})">✕</button>`;
+    thumb.innerHTML = `<img src="${e.target.result}" alt="preview" /><button class="preview-remove" onclick="removePreview(this,${idx})">✕</button>`;
     document.getElementById('previewRow').appendChild(thumb);
   };
   reader.readAsDataURL(file);
 }
+
 function removePreview(btn, idx) {
   pendingFiles[idx] = null;
   btn.closest('.preview-thumb').remove();
@@ -334,15 +293,13 @@ function setupDragDrop() {
   zone.addEventListener('drop',      e => { e.preventDefault(); zone.classList.remove('drag-over'); addPendingFiles(Array.from(e.dataTransfer.files)); });
 }
 
-// ── Upload to Cloudinary ──────────────────────────────────────
+// ── Upload to Cloudinary → Save URL to JSONBin ───────────────
 async function uploadImages() {
   const files = pendingFiles.filter(Boolean);
   if (!files.length) return;
 
   if (CLOUDINARY_CONFIG.cloudName === 'YOUR_CLOUD_NAME') {
-    showSetupGuide();
-    showToast('⚙️ Please configure Cloudinary credentials first!');
-    return;
+    showSetupGuide(); showToast('⚙️ Configure Cloudinary credentials first!'); return;
   }
 
   const caption  = document.getElementById('captionInput').value.trim();
@@ -356,53 +313,62 @@ async function uploadImages() {
   progress.style.display = 'block';
 
   let uploaded = 0;
+  const newImages = [];
+
   for (let i = 0; i < files.length; i++) {
     text.textContent = `Uploading ${i+1} of ${files.length}… 💕`;
     fill.style.width = ((i / files.length) * 100) + '%';
 
     try {
       const formData = new FormData();
-      formData.append('file',           files[i]);
-      formData.append('upload_preset',  CLOUDINARY_CONFIG.uploadPreset);
-      formData.append('folder',         SITE_CONFIG.folder);
-      formData.append('tags',           'memory');   // ← tag for easy listing
-      // Store caption & date in context metadata
-      if (caption) formData.append('context', `caption=${caption}|date=${dateStr}`);
-      else         formData.append('context', `date=${dateStr}`);
+      formData.append('file',          files[i]);
+      formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+      formData.append('folder',        SITE_CONFIG.folder);
 
       const res  = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, {
-        method: 'POST',
-        body:   formData,
+        method: 'POST', body: formData
       });
       const data = await res.json();
 
       if (data.secure_url) {
+        newImages.push({
+          url:      data.secure_url,
+          caption:  caption,
+          date:     dateStr,
+          publicId: data.public_id,
+        });
         uploaded++;
       } else {
         console.error('Upload error:', data);
         showToast('⚠️ Upload failed for one file');
       }
     } catch (err) {
-      console.error(err);
-      showToast('⚠️ Network error during upload');
+      console.error(err); showToast('⚠️ Network error during upload');
     }
   }
 
   fill.style.width = '100%';
-  text.textContent = `Done! ${uploaded} photo${uploaded !== 1 ? 's' : ''} saved 🎉`;
+  text.textContent = `Saving to shared gallery… 💕`;
 
-  setTimeout(async () => {
+  // Prepend new images and save to shared database
+  if (newImages.length > 0) {
+    images = [...newImages, ...images];
+    await saveSharedGallery();
+  }
+
+  text.textContent = `Done! ${uploaded} photo${uploaded !== 1 ? 's' : ''} added 🎉`;
+
+  setTimeout(() => {
     progress.style.display = 'none';
     fill.style.width       = '0%';
     btn.disabled           = false;
     pendingFiles           = [];
     document.getElementById('previewRow').innerHTML = '';
     document.getElementById('captionInput').value   = '';
-    showToast('💕 Memories added to our shared gallery!');
-    // Reload gallery from Cloudinary so both users see the new images
-    await fetchAllImages();
+    showToast('💕 Memories saved to our shared gallery!');
+    renderGallery();
     showSection('gallery');
-  }, 1600);
+  }, 1400);
 }
 
 // ── Config Check ─────────────────────────────────────────────
@@ -412,9 +378,7 @@ function checkConfig() {
     if (notice) notice.style.display = 'none';
   }
 }
-function showSetupGuide() {
-  document.getElementById('setupModal').style.display = 'flex';
-}
+function showSetupGuide() { document.getElementById('setupModal').style.display = 'flex'; }
 
 // ── Toast ─────────────────────────────────────────────────────
 function showToast(msg) {
