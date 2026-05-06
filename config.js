@@ -13,8 +13,9 @@
 // ============================================================
 
 const CLOUDINARY_CONFIG = {
-  cloudName:    'dry5njpao',     // e.g. 'my-sweet-memories'
+  cloudName:    'dry5njpao',     // e.g. 'dxyz1234abc'
   uploadPreset: 'lovely_images',  // e.g. 'memories_upload'
+  apiKey:       '266763638277274',        // e.g. '123456789012345'  ← NEW
 };
 
 // ============================================================
